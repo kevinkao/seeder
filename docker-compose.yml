@@ -1,0 +1,23 @@
+version: "3"
+
+services:
+    web:
+        image: kevinkao/nginx-golang
+        volumes:
+            - ./seeder:/go/src/seeder
+            - ./database:/go/database
+            - ./Makefile:/go/Makefile
+            - ./config:/go/config
+        links:
+            - db
+        environment:
+            - TZ=Asia/Taipei
+
+    db:
+        image: mariadb:10.2
+        volumes:
+            - ./docker/db:/var/lib/mysql
+        environment:
+            - MYSQL_DATABASE=develop
+            - MYSQL_ROOT_PASSWORD=123456
+
