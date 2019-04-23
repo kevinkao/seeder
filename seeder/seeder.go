@@ -85,9 +85,9 @@ func main () {
 						panic(err)
 					}
 
-					if _, err := result.RowsAffected(); err != nil {
-						panic(err)
-					}
+					affected, err := result.RowsAffected()
+					handlerError(err)
+					fmt.Printf("Rows affected: %d\n", affected)
 				}
 				return
 			})
