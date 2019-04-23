@@ -5,10 +5,10 @@ import (
 	"github.com/spf13/viper"
 	"database/sql"
 	"github.com/spf13/cobra"
-	// "github.com/manifoldco/promptui"
 	"encoding/json"
 	"io/ioutil"
 	"fmt"
+	"errors"
 )
 
 type DBConnInfo struct {
@@ -19,11 +19,13 @@ var configFolder string
 var databaseFolder string
 var dbEnvConfig string
 var connInfo *DBConnInfo
+var seedFolder string
 
 func main () {
 	databaseFolder = os.Getenv("GOPATH") + "/database"
 	configFolder = os.Getenv("GOPATH") + "/config"
 	dbEnvConfig = configFolder + "/database.env.json"
+	seedFolder = databaseFolder + "/seeds"
 
 	viper.SetConfigType("json")
 	viper.SetConfigName("database")
@@ -54,58 +56,92 @@ func main () {
 		Use: "run",
 		Short: "Run all the seed file in db.json",
 		Run: func (cmd *cobra.Command, args []string) {
-			seedFolder := databaseFolder + "/seeds"
-			seedFile := seedFolder + "/db.json"
-			if !FileExists(seedFile) {
-				panic("No such db.json in seeds folder")
-			}
+			Confirm("Are you sure? (Y/n)", func () {
+				seedFile := seedFolder + "/db.json"
 
-			file, _ := ioutil.ReadFile(seedFile)
-			var data map[string][]string
-			err := json.Unmarshal(file, &data)
-			handlerError(err)
-
-			err = WithTransaction(db, func(tx *sql.Tx) (err error) {
-				for i := 0; i < len(data["run"]); i++ {
-					sql := data["run"][i]
-					path := seedFolder + fmt.Sprintf("/%s", sql)
-					fmt.Println(path)
-
-					if !FileExists(path) {
-						panic(fmt.Sprintf("No such sql file: %s", path))
-					}
-
-					content, err := ioutil.ReadFile(path)
-					if err != nil {
-						panic(err)
-					}
-
-					result, err := tx.Exec(string(content))
-					if err != nil {
-						panic(err)
-					}
-
-					affected, err := result.RowsAffected()
-					handlerError(err)
-					fmt.Printf("Rows affected: %d\n", affected)
+				if !FileExists(seedFile) {
+					panic("No such db.json in seeds folder")
 				}
-				return
+
+				file, _ := ioutil.ReadFile(seedFile)
+				var data map[string][]string
+				err := json.Unmarshal(file, &data)
+				handlerError(err)
+
+				err = WithTransaction(db, func(tx *sql.Tx) (err error) {
+					for i := 0; i < len(data["run"]); i++ {
+						sql := data["run"][i]
+						path := seedFolder + fmt.Sprintf("/%s", sql)
+						fmt.Println(path)
+
+						if !FileExists(path) {
+							panic(fmt.Sprintf("No such sql file: %s", path))
+						}
+
+						content, err := ioutil.ReadFile(path)
+						if err != nil {
+							panic(err)
+						}
+
+						result, err := tx.Exec(string(content))
+						if err != nil {
+							panic(err)
+						}
+
+						affected, err := result.RowsAffected()
+						handlerError(err)
+						fmt.Printf("Rows affected: %d\n", affected)
+					}
+					return
+				})
+				handlerError(err)
 			})
-			handlerError(err)
 			
 			return
 		},
 	}
 
 	var cmdSql =&cobra.Command{
-		Use: "sql [SQL_NAME]",
+		Use: "sql [SQL_FILE]",
 		Short: "Specify the sql file in seed folder",
+		Args: func (cmd *cobra.Command, args []string) error {
+			if len(args) < 1 {
+				return errors.New("requires a sql argument")
+			}
+
+			for _, path := range args {
+				if !FileExists(path) {
+					return errors.New(fmt.Sprintf("No such sql file %s\n", path))
+				}
+			}
+			
+			return nil
+		},
 		Run: func (cmd *cobra.Command, args []string) {
-			err = WithTransaction(db, func(tx *sql.Tx) (err error) {
-				// 
-				return
+			Confirm("Are you sure? (Y/n)", func () {
+				err = WithTransaction(db, func(tx *sql.Tx) (err error) {
+					for _, sqlFile := range args {
+						fmt.Println(sqlFile)
+
+						content, err := ioutil.ReadFile(sqlFile)
+						if err != nil {
+							panic(err)
+						}
+
+						result, err := tx.Exec(string(content))
+						if err != nil {
+							panic(err)
+						}
+
+						affected, err := result.RowsAffected()
+						handlerError(err)
+						fmt.Printf("Rows affected: %d\n", affected)
+					}
+
+					return
+				})
+				handlerError(err)
 			})
-			handlerError(err)
 		},
 	}
 
