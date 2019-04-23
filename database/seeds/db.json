@@ -1,0 +1,6 @@
+{
+    "run": [
+        "insert_base_data.sql",
+        "insert_base_data_2.sql"
+    ]
+}
