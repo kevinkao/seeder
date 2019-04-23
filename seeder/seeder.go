@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"github.com/spf13/viper"
 	"database/sql"
 	"github.com/spf13/cobra"
@@ -22,8 +23,12 @@ var connInfo *DBConnInfo
 var seedFolder string
 
 func main () {
-	databaseFolder = os.Getenv("GOPATH") + "/database"
-	configFolder = os.Getenv("GOPATH") + "/config"
+	currentPath, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	handlerError(err)
+	fmt.Println(currentPath)
+
+	databaseFolder = currentPath + "/../database"
+	configFolder = currentPath + "/../config"
 	dbEnvConfig = configFolder + "/database.env.json"
 	seedFolder = databaseFolder + "/seeds"
 
